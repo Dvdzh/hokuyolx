@@ -8,25 +8,26 @@ from .exceptions import HokuyoException, HokuyoStatusException
 from .exceptions import HokuyoChecksumMismatch
 from .statuses import activation_statuses, laser_states, tsync_statuses
 
+
 class HokuyoLX(object):
     '''Class for working with Hokuyo laser rangefinders, specifically
     with the following models: UST-10LX, UST-20LX, UST-30LX'''
 
-    addr = ('192.168.0.10', 10940) #: IP address and port of the scanner
-    dmin = 20 #: Minimum measurable distance (in millimeters)
-    dmax = 30000 #: Maximum measurable distance (in millimeters)
-    ares = 1440 #: Angular resolution (number of partitions in 360 degrees)
-    amin = 0 #: Minimum step number of the scanning area
-    amax = 1080 #: Maximum step number of the scanning area
-    aforw = 540 #: Step number of the front direction
-    scan_freq = 40 #: Scanning frequency in Hz
-    model = 'UST-10LX' #: Sensor model
-    tzero = 0 #: Sensor start time
-    tn = 0 #: Sensor timestamp overflow counter
-    convert_time = True #: To convert timestamps to UNIX time or not?
+    addr = ('192.168.0.10', 10940)  # : IP address and port of the scanner
+    dmin = 20  # : Minimum measurable distance (in millimeters)
+    dmax = 30000  # : Maximum measurable distance (in millimeters)
+    ares = 1440  # : Angular resolution (number of partitions in 360 degrees)
+    amin = 0  # : Minimum step number of the scanning area
+    amax = 1080  # : Maximum step number of the scanning area
+    aforw = 540  # : Step number of the front direction
+    scan_freq = 40  # : Scanning frequency in Hz
+    model = 'UST-10LX'  # : Sensor model
+    tzero = 0  # : Sensor start time
+    tn = 0  # : Sensor timestamp overflow counter
+    convert_time = True  # : To convert timestamps to UNIX time or not?
 
-    _sock = None #: TCP connection socket to the sensor
-    _logger = None #: Logger instance for performing logging operations
+    _sock = None  # : TCP connection socket to the sensor
+    _logger = None  # : Logger instance for performing logging operations
 
     def __init__(self, activate=True, info=True, tsync=True, addr=None,
                  buf=512, timeout=5, time_tolerance=300, logger=None,
@@ -63,7 +64,8 @@ class HokuyoLX(object):
             self.addr = addr
         self.buf = buf
         self.timeout = timeout
-        self._logger = logging.getLogger('hokuyo') if logger is None else logger
+        self._logger = logging.getLogger(
+            'hokuyo') if logger is None else logger
         self.time_tolerance = time_tolerance
         self.convert_time = convert_time
         self._connect_to_laser(False)
@@ -74,7 +76,7 @@ class HokuyoLX(object):
         if activate:
             self.activate()
 
-    #Low-level data converting and checking
+    # Low-level data converting and checking
 
     @staticmethod
     def _check_sum(msg, cc=None):
@@ -111,14 +113,14 @@ class HokuyoLX(object):
         logging.debug('Sensor timestamp: %d', ts)
         t = self.tzero + ts + self._tn*(1 << 24)
         logging.debug('Converted timestamp: %d (t0: %d, tn: %d)',
-            t, self.tzero, self._tn)
+                      t, self.tzero, self._tn)
         dt = int(time.time()*1000) - t
         logging.debug('Delta t with local time: %d', dt)
         if abs(dt) > self.time_tolerance:
             diff = (1 << 24) - self.time_tolerance
             if dt > diff and self.tzero != 0:
                 self._logger.warning('Timestamp overflow detected, '
-                                    '%d -- %d' % (dt, diff))
+                                     '%d -- %d' % (dt, diff))
                 self._tn += 1
             else:
                 self._logger.warning(
@@ -196,7 +198,7 @@ class HokuyoLX(object):
         self._logger.debug('Got response with status %s', status)
         return status, resp
 
-    #Processing and filtering scan data
+    # Processing and filtering scan data
 
     def get_angles(self, start=None, end=None, grouping=0):
         '''Returns array of angles for given `start`, `end` and `grouping`
@@ -268,7 +270,7 @@ class HokuyoLX(object):
             data = data[data[:, 2] <= imax]
         return data
 
-    #Control of sensor state
+    # Control of sensor state
 
     def _force_standby(self):
         '''Forces standby state, if it unable to do it throws an exception'''
@@ -350,7 +352,7 @@ class HokuyoLX(object):
         if status != '00':
             raise HokuyoStatusException(status)
 
-    #Single measurments
+    # Single measurments
 
     def _single_measurment(self, with_intensity, start, end, grouping):
         '''Generic function for taking single measurment.
@@ -484,7 +486,7 @@ class HokuyoLX(object):
         return ts, self._filter(scan, start, end, grouping,
                                 dmin, dmax, imin, imax)
 
-    #Continous measurments
+    # Continous measurments
 
     def _iter_meas(self, with_intensity, scans, start, end, grouping, skips):
         '''Generic generator for taking continous measurment. If `scan` is
@@ -503,7 +505,7 @@ class HokuyoLX(object):
         while True:
             data = self._recv()
             self._logger.debug('Recieved data in the scan response cycle: %s' %
-                              data)
+                               data)
             header = data.pop(0)
             # TODO add string part check for header
             req = cmd + params[:-2]
@@ -685,7 +687,7 @@ class HokuyoLX(object):
                                 dmin, dmax, imin, imax)
             yield (scan, timestamp, pending)
 
-    #Time synchronization methods
+    # Time synchronization methods
 
     def _tsync_cmd(self, code):
         ''' Sends time synchronization command with the given code
@@ -766,7 +768,7 @@ class HokuyoLX(object):
                 'Failed to exit time sync mode: %s (%s)' %
                 (description, code))
 
-    #Sensor information
+    # Sensor information
 
     def _process_info_line(self, line):
         '''Processes one line in response on info request and returns processed
@@ -827,7 +829,9 @@ class HokuyoLX(object):
         status, data = self._send_req('%ST')
         if status != '00':
             raise HokuyoStatusException(status)
-        state = self._check_sum(data[0])
+        # state = self._check_sum(data[0])
+        state = data[0]
+
         if state not in laser_states:
             raise HokuyoException('Unknown laser state code: %s' % state)
         return int(state), laser_states[state]
@@ -845,7 +849,7 @@ class HokuyoLX(object):
         self.aforw = params['AFRT']
         self.model = params['MODL']
 
-    #Service methods
+    # Service methods
 
     def reset(self):
         '''This command forces the sensor to switch to the standby state
@@ -914,7 +918,7 @@ class HokuyoLX(object):
                                   'recieved status %s not 01' % status)
 
         self._logger.info('Reboot: done first step, sending '
-                         'second reboot command')
+                          'second reboot command')
         status, _ = self._send_req('RB')
         if status != '00':
             raise HokuyoException('Reboot failed on second step '
